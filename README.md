@@ -12,8 +12,8 @@ in order to populate a target system with the modified user data
 
 ## ldifsync:
 takes two input files (source, target) and generates an input file for ldapmodify
-(part of the openldap suite)
-`ldifsync.py <source-ldif> <target-ldif>`
+to stdout (ldapmodify is part of the openldap suite)
+`ldifsync.py <source-ldif> <target-ldif> > output.ldif` 
 (see example)
 
 ## Installation
@@ -23,5 +23,5 @@ takes two input files (source, target) and generates an input file for ldapmodif
 
 ## remarks
 - using make
-Make is truly old, but in this case it proves to be quite handy
-as in case of failures it does all the exception handing for us.
+Make is truly old, but here it is quite handy
+as in case of failures it does all the exception handling for us.
