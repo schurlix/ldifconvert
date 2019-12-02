@@ -1,61 +1,77 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Parameters: <from.ldif>[1] <to.ldif>[2]
+# from.ldif shall contain all entries that are currently in the ldap server
+# to.ldif shall contain the final state in the ldap server
 
 import logging
 import sys
-import ldif
+import ldif3
+import os
+
+
+def dn_parts_count(par_dn):
+    return len(par_dn.split(','))
+
 
 logging.basicConfig(level=logging.INFO)
 
-# populate source
-sourceparser = ldif.LDIFRecordList(open(sys.argv[1]))
-sourceparser.parse()
-sourced = {k: v for k, v in sourceparser.all_records}
-sources = set(sourced)
-logging.info("Source: %d entries" % len(sourced))
+# populate from
+fromparser = ldif3.LDIFParser(open(sys.argv[1], mode="rb"))
+fromparser.parse()
+from_dict = {k: v for k, v in fromparser.parse()}
+from_set = set(from_dict)
+logging.info("from: %d entries" % len(from_dict))
 
-# populate target
-targetparser = ldif.LDIFRecordList(open(sys.argv[2]))
-targetparser.parse()
-targetd = {k: v for k, v in targetparser.all_records}
-targets = set(targetd)
-logging.info("Target: %d entries" % len(targetd))
+# populate to
+toparser = ldif3.LDIFParser(open(sys.argv[2], mode="rb"))
+toparser.parse()
+to_dict = {k: v for k, v in toparser.parse()}
+to_set = set(to_dict)
+logging.info("to: %d entries" % len(to_dict))
 
-writer = ldif.LDIFWriter(sys.stdout)
+writer = ldif3.LDIFWriter(os.fdopen(sys.stdout.fileno(), mode="wb"))
 
-# delete dn's that are only on the target - deepest first
-todelete = targets - sources
-logging.info('Only on target: delete {:d} entries'.format(len(todelete)))
-for dn in sorted(todelete, key=lambda x: len(x.split(',')), reverse=True):
+# delete dn's that are only on the to -
+todelete = from_set - to_set  #
+logging.info('Only on to: delete {:d} entries'.format(len(todelete)))
+for dn in sorted(todelete, key=dn_parts_count, reverse=True):
     writer.unparse(dn, {"changetype": [u"delete"]})
 
-# add records which are only in our source - higher first
-toadd = sources - targets
-logging.info("Only on source: add {:d} entries".format(len(toadd)))
-for dn in sorted(toadd, key=lambda x: len(x.split(','))):
-    writer.unparse(dn, [(k, v) for k, v in sourced[dn].items()])
+# add records which are only in our from - DNs with less parts first
+toadd = to_set - from_set
+logging.info("Only on from: add {:d} entries".format(len(toadd)))
+for dn in sorted(toadd, key=dn_parts_count):
+    writer.unparse(dn, [(k, v) for k, v in to_dict[dn].items()])
 
-# create modifies where dn is same but attrs differ
+# create modify items where dn is same but attrs differ
 modifys = {}  # Dict[dn, -> entry]
-for dn in targets.intersection(sources):
-    sourceattrs = sourced[dn]  # orderedDict
-    targetattrs = targetd[dn]  # orderedDict
+for dn in to_set.intersection(from_set):
+
+    from_attrs = from_dict[dn]  # orderedDict
+    to_attrs = to_dict[dn]  # orderedDict
     entry = []
+
     # compare the dict values - see if we need to do more
-    if sourceattrs == targetattrs:
+    if from_attrs == to_attrs:  # should never happen
+        logging.debug("same attrs for dn: %s" % dn)
         continue
-    # add attributes only in source
-    addattrs = set(sourceattrs) - set(targetattrs)
+
+    # add attributes that are wanted on the to and are not in from
+    addattrs = set(to_attrs) - set(from_attrs)
     for attr in addattrs:
-        entry.append((0, attr, sourceattrs[attr]))
-    # delete attributes not in source
-    delattrs = set(targetattrs) - set(sourceattrs)
+        entry.append((0, attr, to_attrs[attr]))
+
+    # delete attributes not in from
+    delattrs = set(from_attrs) - set(to_attrs)
     for attr in delattrs:
         entry.append((1, attr, []))
-    commonatrs = set(sourceattrs).intersection(targetattrs)
+
+    # now modify attributes that exist in both but differ
+    commonatrs = set(from_attrs).intersection(to_attrs)
     for attr in commonatrs:
-        if sorted(sourceattrs[attr]) != sorted(targetattrs[attr]):
-            entry.append((2, attr, sourceattrs[attr]))
+        if sorted(from_attrs[attr]) != sorted(to_attrs[attr]):
+            entry.append((2, attr, to_attrs[attr]))
     if entry:
         modifys[dn] = entry
 logging.info('DN\'s needing modification: {:d}'.format(len(modifys)))

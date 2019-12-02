@@ -1,24 +1,28 @@
-# ldifconvert and ldifsync
-- **ldifconvert:** convert ldifs according to rules in a config file
-in order to populate a target system with the modified user data
+# ldifmangle and ldifdiff
 
-- **ldifsync:** produces an incremental ldif for writing deltas to a target system
+- **ldifmangle:** mangle (i.e. convert) ldif files according to rules in a
+config file maybe in order to populate a target system with the modified user
+data.
+
+- **ldifdiff:** produces an ldif suited as input for ldapmodify for writing deltas to a target system
 
 - Just copy the example directory and change the Makefile .. enjoy!
 
-## ldifconvert:
-`ldifconvert.py <configfile>`
+## ldifmangle:
+`ldifmangle.py <configfile>`
 (see example)
 
-## ldifsync:
-takes two input files (source, target) and generates an input file for ldapmodify
+## ldifdiff:
+takes two input files (source, target resp. \<from\> and \<to\>) and generates an input file for ldapmodify
 to stdout (ldapmodify is part of the openldap suite)
-`ldifsync.py <source-ldif> <target-ldif> > output.ldif` 
+`ldifdiff.py <from-ldif> <to-ldif> > output.ldif` 
 (see example)
 
 ## Installation
 - Prerequisites:
-  - [python-ldap](https://www.python-ldap.org/) (only the ldif modulue is used here)
+  - [python-ldif3](https://pypi.org/project/ldif3/) (pip install ldif3)
+
+## Optional, but likely
   - [openldap](http://www.openldap.org/)
 
 ## remarks
